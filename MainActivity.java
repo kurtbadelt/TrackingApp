@@ -8,6 +8,10 @@ import android.widget.EditText;
 import android.widget.ToggleButton;
 import android.util.Log;
 
+import java.security.Timestamp;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+
 public class MainActivity extends AppCompatActivity {
     private String placasUnidad="";
     private String nombreConductor="";
@@ -32,10 +36,10 @@ public class MainActivity extends AppCompatActivity {
         this.botonEncendido.setEnabled(false);
 
         this.checkTnC.setOnClickListener(new View.OnClickListener(){
-                                             public void onClick(View view){
-                                                 botonEncendido.setEnabled(true);
-                                             }
-                                         }
+            public void onClick(View view){
+                botonEncendido.setEnabled(true);
+            }
+        }
         );
 
 
@@ -60,6 +64,28 @@ public class MainActivity extends AppCompatActivity {
         this.placasUnidad = textPlacas.getText().toString();
         this.nombreConductor = textConductor.getText().toString();
         this.terminosYCondiciones = checkTnC.isChecked();
-        Log.w("execute ",""+this.placasUnidad+","+this.nombreConductor+","+this.terminosYCondiciones);
+
+
+
+
+        Log.w("execute ",""+this.placasUnidad+","+this.nombreConductor+","+this.terminosYCondiciones+" TS: "+getCurrentTimeStamp());
+    }
+
+    /**
+     *
+     * @return yyyy-MM-dd HH:mm:ss formate date as string
+     */
+    public static String getCurrentTimeStamp(){
+        try {
+
+            SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+            String currentDateTime = dateFormat.format(new Date()); // Find todays date
+
+            return currentDateTime;
+        } catch (Exception e) {
+            e.printStackTrace();
+
+            return null;
+        }
     }
 }
