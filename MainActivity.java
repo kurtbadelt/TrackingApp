@@ -48,6 +48,7 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.O
     private GoogleApiClient mGoogleApiClient;
     private GoogleApiClient mGoogleApiClient_Location;
     private LocationRequest mLocationRequest;
+    private boolean writeToDB=false;
 
     /**
      * Método para obtener el timestamp
@@ -73,6 +74,7 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.O
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
+        this.runtime_permissions();
 
 
 
@@ -127,21 +129,24 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.O
 
         //Location
 
-        this.runtime_permissions();
 
-            
-            mGoogleApiClient_Location = new GoogleApiClient.Builder(this)
-                    .addConnectionCallbacks(this)
-                    .addOnConnectionFailedListener(this)
-                    .addApi(LocationServices.API)
-                    .build();
+
+
+        mGoogleApiClient_Location = new GoogleApiClient.Builder(this)
+                .addConnectionCallbacks(this)
+                .addOnConnectionFailedListener(this)
+                .addApi(LocationServices.API)
+                .build();
 
     }
 
     @Override
     protected void onStart() {
-        super.onStart();
-        mGoogleApiClient_Location.connect();
+
+            super.onStart();
+            mGoogleApiClient_Location.connect();
+
+
     }
 
     @Override
@@ -207,6 +212,8 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.O
     }
 
     public void encenderServicio() {
+
+        this.writeToDB=true;
         this.placasUnidad = textPlacas.getText().toString();
         this.nombreConductor = textConductor.getText().toString();
         this.terminosYCondiciones = checkTnC.isChecked();
@@ -215,7 +222,7 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.O
     }
 
     public void apagarServicio() {
-        signOut();
+        this.writeToDB=false;
         this.textConductor.setText("");
         this.textPlacas.setText("");
         this.checkTnC.setChecked(false);
@@ -224,6 +231,7 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.O
         this.botonEncendido.setEnabled(false);
         this.checkTnC.setEnabled(false);
         this.notif.setText("Desconectado de Google " + "Servicio Inactivo");
+
 
     }
 
@@ -246,15 +254,16 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.O
         mLocationRequest.setInterval(5000);
         mLocationRequest.setFastestInterval(3000);
         try {
-          LocationServices.FusedLocationApi.requestLocationUpdates(mGoogleApiClient_Location, mLocationRequest, this);
-           Location locale =  LocationServices.FusedLocationApi.getLastLocation(mGoogleApiClient_Location);
-            this.notif.setText(this.notif.getText()+" Lati: "+locale.getLatitude()+" Long: "+locale.getLongitude());
+
+            LocationServices.FusedLocationApi.requestLocationUpdates(mGoogleApiClient_Location, mLocationRequest, this);
+
 
 
         } catch (SecurityException ex) {
             this.notif.setText("La aplicación requiere de permisos para obtener tu ubicación");
 
-            Log.w("**Error de seguridad ", ex.toString());
+            Log.w("**Error de seguridad ", ex.toString()+"**");
+
         }
     }
 
@@ -267,8 +276,12 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.O
 
     @Override
     public void onLocationChanged(Location location) {
-        this.notif.setText(this.notif.getText()+" Lati: "+location.getLatitude()+" Long: "+location.getLongitude());
+
         Log.w("Location Changed", "" + this.placasUnidad + "," + this.nombreConductor + "," + this.terminosYCondiciones + " TS: " + getCurrentTimeStamp() + " " + this.botonEncendido.isChecked() + " Lat: " + location.getLatitude() + " Long: " + location.getLongitude());
+        if(writeToDB){
+            Log.w("on loc changed","write to db enabled");
+            this.notif.setText(this.notif.getText()+" Lati: "+location.getLatitude()+" Long: "+location.getLongitude());
+        }
 
     }
 
