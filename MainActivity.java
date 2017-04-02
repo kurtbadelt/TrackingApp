@@ -1,7 +1,10 @@
 package tech.e32.lendme_rastreo;
 
 import android.Manifest;
+import android.content.BroadcastReceiver;
+import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.location.Location;
 import android.os.Build;
@@ -29,11 +32,14 @@ import com.google.android.gms.common.api.Status;
 import com.google.android.gms.location.LocationListener;
 import com.google.android.gms.location.LocationRequest;
 import com.google.android.gms.location.LocationServices;
+import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.FirebaseDatabase;
 
 import java.text.SimpleDateFormat;
 import java.util.Date;
 
 public class MainActivity extends AppCompatActivity implements GoogleApiClient.OnConnectionFailedListener, ConnectionCallbacks, LocationListener {
+
     private static final String TAG = "SigInActivity";
     private static final int RC_SIGN_IN = 9001;
     private String placasUnidad = "";
@@ -46,28 +52,30 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.O
     private com.google.android.gms.common.SignInButton botonLogIn = null;
     private TextView notif = null;
     private GoogleApiClient mGoogleApiClient;
-    private GoogleApiClient mGoogleApiClient_Location;
-    private LocationRequest mLocationRequest;
     private boolean writeToDB=false;
+    private BroadcastReceiver broadcastReceiver;
+    private String email = null;
+    private GoogleApiClient mGoogleApiClient_Location;  //Mover a Servicio
+    private LocationRequest mLocationRequest; //Mover a servicio
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if(broadcastReceiver == null){
+            broadcastReceiver = new BroadcastReceiver() {
+                @Override
+                public void onReceive(Context context, Intent intent) {
 
-    /**
-     * Método para obtener el timestamp
-     *
-     * @return yyyy-MM-dd HH:mm:ss formate date as string
-     */
-    public static String getCurrentTimeStamp() {
-        try {
+                    notif.append("\n" +intent.getExtras().get("coordinates"));
+                    Log.w("onResume_",intent.getExtras().get("coordinates").toString());
 
-            SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
-            String currentDateTime = dateFormat.format(new Date()); // Find todays date
 
-            return currentDateTime;
-        } catch (Exception e) {
-            e.printStackTrace();
-
-            return null;
+                }
+            };
         }
+        registerReceiver(broadcastReceiver,new IntentFilter("location_update"));
     }
+
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -127,11 +135,8 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.O
 
         });
 
-        //Location
-
-
-
-
+       //Location
+        //Mover a servicio
         mGoogleApiClient_Location = new GoogleApiClient.Builder(this)
                 .addConnectionCallbacks(this)
                 .addOnConnectionFailedListener(this)
@@ -144,7 +149,7 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.O
     protected void onStart() {
 
             super.onStart();
-            mGoogleApiClient_Location.connect();
+            mGoogleApiClient_Location.connect(); //mover a servicio
 
 
     }
@@ -152,19 +157,18 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.O
     @Override
     protected void onStop() {
         super.onStop();
-        if (mGoogleApiClient_Location.isConnected()) {
+        if (mGoogleApiClient_Location.isConnected()) { //mover a servicio
             mGoogleApiClient_Location.disconnect();
         }
     }
 
-    /**
-     *
-     */
-    private void signIn() {
-        Intent singInIntent = Auth.GoogleSignInApi.getSignInIntent(mGoogleApiClient);
-        startActivityForResult(singInIntent, RC_SIGN_IN);
-    }
 
+    /**
+     * Maneja el resultado de la actividad de logeo a la api de google
+     * @param requestCode
+     * @param resultCode
+     * @param data
+     */
     public void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
 
@@ -176,11 +180,16 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.O
 
     }
 
+    /**
+     * Manejador de la respuesta de google ante el login
+     * @param result
+     */
     public void handleSignInResult(GoogleSignInResult result) {
         Log.d(TAG, "handleSignInResult" + result.isSuccess());
         if (result.isSuccess()) {
             GoogleSignInAccount acct = result.getSignInAccount();
             this.textConductor.setText(acct.getDisplayName());
+            this.email = acct.getEmail();
         } else {
 
         }
@@ -213,6 +222,9 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.O
 
     public void encenderServicio() {
 
+        Intent intento = new Intent(getApplicationContext(),Servicio_Rastreo.class);
+        startService(intento);
+
         this.writeToDB=true;
         this.placasUnidad = textPlacas.getText().toString();
         this.nombreConductor = textConductor.getText().toString();
@@ -222,6 +234,11 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.O
     }
 
     public void apagarServicio() {
+
+        signOut();
+        Intent intento = new Intent(getApplicationContext(),Servicio_Rastreo.class);
+        stopService(intento);
+
         this.writeToDB=false;
         this.textConductor.setText("");
         this.textPlacas.setText("");
@@ -230,11 +247,23 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.O
         this.textPlacas.setEnabled(false);
         this.botonEncendido.setEnabled(false);
         this.checkTnC.setEnabled(false);
-        this.notif.setText("Desconectado de Google " + "Servicio Inactivo");
+        this.notif.setText("Desconectado de Google, " + "Servicio Inactivo");
+        Log.w("*Apagar Servicio","---");
 
 
     }
 
+    /**
+     *Login con servicio de google
+     */
+    private void signIn() {
+        Intent singInIntent = Auth.GoogleSignInApi.getSignInIntent(mGoogleApiClient);
+        startActivityForResult(singInIntent, RC_SIGN_IN);
+    }
+
+    /**
+     * Logout al usuario de google
+     */
     private void signOut() {
         Auth.GoogleSignInApi.signOut(mGoogleApiClient).setResultCallback(
                 new ResultCallback<Status>() {
@@ -247,6 +276,7 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.O
 
     }
 
+    //Mover a servicio
     @Override
     public void onConnected(@Nullable Bundle bundle) {
         mLocationRequest = LocationRequest.create();
@@ -267,6 +297,7 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.O
         }
     }
 
+    //Mover a Servicio
     @Override
     public void onConnectionSuspended(int i) {
         Log.i(TAG, "Connection Suspended");
@@ -274,6 +305,7 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.O
 
     }
 
+    //Mover a servicio
     @Override
     public void onLocationChanged(Location location) {
 
@@ -281,7 +313,21 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.O
         if(writeToDB){
             Log.w("on loc changed","write to db enabled");
             this.notif.setText(this.notif.getText()+" Lati: "+location.getLatitude()+" Long: "+location.getLongitude());
+
+            //Escribir a base de datos:
+            UbicacionConductor ubc = new UbicacionConductor();
+            ubc.crearConductor(this.email,this.nombreConductor,this.placasUnidad,getCurrentTimeStamp(),"Aceptado",""+location.getLatitude(),""+location.getLongitude());
+            guardarUbicacion(ubc);
         }
+
+    }
+
+    //Escribir a la base de datos
+    private void guardarUbicacion(UbicacionConductor ubc) {
+
+
+        DatabaseReference  mDatabase = FirebaseDatabase.getInstance().getReference();
+        mDatabase.child("Ubicaciones").child(ubc.getConductor()+"-"+ubc.getTimeStamp()).setValue(ubc);
 
     }
 
@@ -307,6 +353,27 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.O
             }
         }
     }
+
+    /**
+     * Método para obtener el timestamp
+     *
+     * @return yyyy-MM-dd HH:mm:ss formate date as string
+     */
+    public static String getCurrentTimeStamp() {
+        try {
+
+            SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+            String currentDateTime = dateFormat.format(new Date()); // Find todays date
+
+            return currentDateTime;
+        } catch (Exception e) {
+            e.printStackTrace();
+
+            return null;
+        }
+    }
+
+
 
 
 }
